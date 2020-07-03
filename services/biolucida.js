@@ -3,7 +3,7 @@ import axios from 'axios'
 const apiClient = axios.create({
   baseURL: process.env.sparc_api_host,
   withCredentials: false,
-  timeout: 10000,
+  timeout: 20000,
 })
 
 const getImageMapData = (id) => {

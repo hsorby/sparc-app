@@ -41,6 +41,7 @@
               <a
                 target="_blank"
                 :href="href"
+                :style="{ backgroundColor: imageOverlayColour(index) }"
                 rel="noopener noreferrer"
                 :title="getThumbnailImageTitle(index)"
               >
@@ -74,7 +75,12 @@
         <span>&rsaquo;</span>
       </a>
     </div>
-    <index-indicator :count="imageCount" :current="currentIndex" />
+    <index-indicator
+      :count="imageCount"
+      :items="overlayColours"
+      :current="currentIndex"
+      @update:index="indicatorClicked"
+    />
   </div>
 </template>
 
@@ -166,6 +172,9 @@ export default {
     this.getThumbnails()
   },
   methods: {
+    indicatorClicked(index) {
+      this.currentIndex = index
+    },
     displayState(index) {
       let offset = 0
       const oddImagesVisible = this.numberOfImagesVisible % 2 === 1
@@ -201,6 +210,8 @@ export default {
     getThumbnails() {
       this.thumbnails.clear
       this.slideAxis = undefined
+      this.overlayColours = [...Array(this.imageCount)].map(() => 'grey')
+      this.imageTypes = [...Array(this.imageCount)].map(() => 'grey')
       this.thumbnails = Array.from(this.datasetImages, (dataset_image) => {
         return {
           id: dataset_image.image_id,
@@ -209,7 +220,6 @@ export default {
         }
       })
       this.datasetImages.forEach((dataset_image) => {
-        this.overlayColours = [...Array(this.imageCount)].map(() => 'grey')
         const image_id = dataset_image.image_id
         biolucida
           .getThumbnail(image_id)
@@ -229,13 +239,13 @@ export default {
                 this.imageNames[index] = imageName
                 let imageType = ''
                 if (imageInfo.name.toUpperCase().endsWith('JPX')) {
-                  this.overlayColours.splice(index, 1, 'cyan')
+                  this.overlayColours.splice(index, 1, '#8300BF')
                   imageType += '3D'
                 } else {
-                  this.overlayColours[index] = 'violet'
+                  this.overlayColours.splice(index, 1, '#24245B')
                   imageType += '2D'
                 }
-                this.imageTypes[index] = imageType
+                this.imageTypes.splice(index, 1, imageType)
               })
               .catch((error) => {
                 console.log('Error fetching image information:', image_id)
@@ -274,9 +284,9 @@ export default {
       })
       this.datasetScaffolds.forEach((dataset_scaffold) => {
         const scaffold_index = this.thumbnails.length
-        this.imageNames[scaffold_index] = dataset_scaffold.name
-        this.imageTypes[scaffold_index] = 'Scaffold'
-        this.overlayColours[scaffold_index] = 'yellow'
+        this.imageNames.splice(scaffold_index, 1, dataset_scaffold.name)
+        this.imageTypes.splice(scaffold_index, 1, 'Scaffold')
+        this.overlayColours.splice(scaffold_index, 1, '#303133')
         this.thumbnails.push({
           id: dataset_scaffold.name,
           img: this.defaultScaffoldImg,
@@ -488,7 +498,7 @@ a.next {
 }
 
 .polaroid a:after {
-  color: #333;
+  color: white;
   font-size: 1em;
   content: attr(title);
   position: relative;
