@@ -37,16 +37,24 @@
               query: getThumbnailLinkQuery(thumbnail_image),
             }"
           >
-            <a target="_blank" :href="href" rel="noopener noreferrer">
-              <img
-                :ref="'key_image_' + thumbnail_image.id"
-                :src="thumbnail_image.img"
-                alt="thumbnail missing"
-                class="thumbnail thumbnail-100"
-                :height="slideNaturalHeight"
-                :width="slideNaturalWidth"
-              />
-            </a>
+            <div class="polaroid">
+              <a
+                target="_blank"
+                :href="href"
+                rel="noopener noreferrer"
+                :title="getThumbnailImageTitle(index)"
+              >
+                <img
+                  :ref="'key_image_' + thumbnail_image.id"
+                  :src="thumbnail_image.img"
+                  alt="thumbnail missing"
+                  class="thumbnail thumbnail-100"
+                  :title="imageNames[index]"
+                  :height="slideNaturalHeight"
+                  :width="slideNaturalWidth"
+                />
+              </a>
+            </div>
           </nuxt-link>
           <div
             class="overlay"
@@ -207,7 +215,7 @@ export default {
           .getThumbnail(image_id)
           .then((response) => {
             const index = this.thumbnails.findIndex(
-              (item) => item.id === image_id,
+              (item) => item.id === image_id
             )
             let thumbnail = this.thumbnails[index]
             biolucida
@@ -267,7 +275,7 @@ export default {
       this.datasetScaffolds.forEach((dataset_scaffold) => {
         const scaffold_index = this.thumbnails.length
         this.imageNames[scaffold_index] = dataset_scaffold.name
-        this.imageTypes[scaffold_index] = 'scaffold'
+        this.imageTypes[scaffold_index] = 'Scaffold'
         this.overlayColours[scaffold_index] = 'yellow'
         this.thumbnails.push({
           id: dataset_scaffold.name,
@@ -278,7 +286,7 @@ export default {
           .browse(
             this.$route.params.datasetId,
             dataset_scaffold.version,
-            dataset_scaffold.path,
+            dataset_scaffold.path
           )
           .then((response) => {
             response.data.files.forEach((entry) => {
@@ -287,7 +295,7 @@ export default {
                   scaffold_index
                 ].metadata_file = entry.uri.replace(
                   's3://blackfynn-discover-use1/',
-                  '',
+                  ''
                 )
               }
             })
@@ -295,7 +303,7 @@ export default {
           .catch((error) => {
             console.log(
               'Error fetching scaffold files: ',
-              dataset_scaffold.name,
+              dataset_scaffold.name
             )
             console.log(error.message)
           })
@@ -305,6 +313,13 @@ export default {
       const linkParts = shareLink.split(process.env.BL_SHARE_LINK_PREFIX)
 
       return linkParts[1]
+    },
+    getThumbnailImageTitle(index) {
+      let title = this.imageTypes[index]
+      if (title !== 'Scaffold') {
+        title += ' Image'
+      }
+      return title
     },
     getThumbnailLinkType(imageInfo) {
       const imageInfoKeys = Object.keys(imageInfo)
@@ -388,7 +403,7 @@ export default {
 
 .key-image-span.active {
   transform: scale(1.16);
-  border: 4px #8300bf solid;
+  /* border: 4px #8300bf solid; */
 }
 
 .key-image-span {
@@ -403,7 +418,7 @@ export default {
   width: 1.61em;
   height: 1em;
   border-radius: 3px;
-  opacity: 0.8;
+  opacity: 0;
 }
 
 img {
@@ -453,5 +468,35 @@ a.next {
   width: 2em;
   border-radius: 3px;
   background-color: #555;
+}
+
+.polaroid a {
+  background: #ffffff;
+  display: inline-block;
+  margin: 0.55em 0.75em 0.3em;
+  padding: 0.5em 0.5em 1.2em;
+  text-align: center;
+  text-decoration: none;
+  -webkit-box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+  -moz-box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+  /* -webkit-transition: all 0.2s linear;
+  -moz-transition: all 0.2s linear;
+  transition: all 0.2s linear; */
+  /* z-index: 0; */
+  position: relative;
+}
+
+.polaroid a:after {
+  color: #333;
+  font-size: 1em;
+  content: attr(title);
+  position: relative;
+  top: 0.6em;
+}
+
+.polaroid img {
+  display: block;
+  /* width: 250px; */
 }
 </style>

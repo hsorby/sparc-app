@@ -28,6 +28,7 @@ export default {
 .indicator-container {
   display: flex;
   justify-content: center;
+  padding-top: 1em;
 }
 .indicator {
   width: 1em;
