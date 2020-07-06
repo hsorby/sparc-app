@@ -212,6 +212,7 @@ export default {
       this.slideAxis = undefined
       this.overlayColours = [...Array(this.imageCount)].map(() => 'grey')
       this.imageTypes = [...Array(this.imageCount)].map(() => 'grey')
+      this.imageNames = [...Array(this.imageCount)].map(() => '')
       this.thumbnails = Array.from(this.datasetImages, (dataset_image) => {
         return {
           id: dataset_image.image_id,
@@ -236,7 +237,7 @@ export default {
                 imageName =
                   imageName.substring(0, imageName.lastIndexOf('.')) ||
                   imageName
-                this.imageNames[index] = imageName
+                this.imageNames.splice(index, 1, imageName)
                 let imageType = ''
                 if (imageInfo.name.toUpperCase().endsWith('JPX')) {
                   this.overlayColours.splice(index, 1, '#8300BF')
