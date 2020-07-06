@@ -399,7 +399,10 @@ export default {
       return name
     },
     imageOverlayColour(index) {
-      return this.overlayColours[index]
+      const saturatedColour = this.overlayColours[index] + '88'
+      return this.currentIndex === index
+        ? this.overlayColours[index]
+        : saturatedColour
     },
   },
 }
