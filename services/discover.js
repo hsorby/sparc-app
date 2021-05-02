@@ -20,6 +20,11 @@ const browse = async (id, version, path = undefined) => {
   return apiClient.get(`/${id}/versions/${version}/files/browse`, config)
 }
 
+const fetch = async (id, version, path) => {
+  return await apiClient.get(`/s3-resource/${id}/${version}/files/${path}`)
+}
+
 export default {
-  browse
+  browse,
+  fetch
 }
