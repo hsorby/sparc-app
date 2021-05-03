@@ -6,4 +6,14 @@
   &.uppercase {
     text-transform: uppercase;
   }
+  &.secondary{
+    background: #f9f2fc;
+    border: 1px solid $app-primary-color;
+    color: $app-primary-color;
+  }
+  &.primary{
+    background: $median;
+    border: 1px solid $median;
+    color: #fff;
+  }
 }

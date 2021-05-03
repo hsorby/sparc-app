@@ -3,7 +3,15 @@
     <breadcrumb :breadcrumb="breadcrumb" title="Find Data" />
 
     <page-hero>
-      <search-form v-model="searchQuery" @search="submitSearch" @clear="clearSearch" :q="q" />
+      <h1>
+        Find Data
+      </h1>
+      <search-form
+        v-model="searchQuery"
+        :q="q"
+        @search="submitSearch"
+        @clear="clearSearch"
+      />
 
       <ul class="search-tabs">
         <li v-for="type in searchTypes" :key="type.label">
@@ -27,9 +35,23 @@
       <el-row :gutter="32" type="flex">
         <el-col :span="24">
           <div class="search-heading">
-            <p v-if="!isLoadingSearch && searchData.items.length">
-              {{ searchHeading }}
+            <p v-show="!isLoadingSearch && searchData.items.length">
+              {{ searchHeading }} | Showing
+              <pagination-menu
+                :page-size="searchData.limit"
+                @update-page-size="updateDataSearchLimit"
+              />
             </p>
+            <el-pagination
+              v-if="searchData.limit < searchData.total"
+              :small="isMobile"
+              :page-size="searchData.limit"
+              :pager-count="5"
+              :current-page="curSearchPage"
+              layout="prev, pager, next"
+              :total="searchData.total"
+              @current-change="onPaginationPageChange"
+            />
           </div>
           <div class="mb-16">
             <div class="active__filter__wrap">
@@ -51,20 +73,63 @@
               </div>
             </div>
           </div>
-          <div v-loading="isLoadingSearch" class="table-wrap">
-            <component :is="searchResultsComponent" :table-data="tableData" @sort-change="handleSortChange" />
-            <el-pagination
-              v-if="searchData.limit < searchData.total"
-              :page-size="searchData.limit"
-              :pager-count="5"
-              :current-page="curSearchPage"
-              layout="prev, pager, next"
-              :total="searchData.total"
-              @current-change="onPaginationPageChange"
-            />
-          </div>
+          <el-row :gutter="32">
+            <el-col
+              v-if="searchType.type === 'dataset'"
+              :sm="24"
+              :md="6"
+              :lg="4"
+            >
+              <div class="dataset-filters table-wrap">
+                <h2>Refine datasets by:</h2>
+                <h3>Status</h3>
+                <div class="dataset-filters__filter-group">
+                  <el-checkbox-group
+                    v-model="datasetFilters"
+                    @change="setDatasetFilter"
+                  >
+                    <el-checkbox label="Public" />
+                    <el-checkbox label="Embargoed" />
+                  </el-checkbox-group>
+                </div>
+              </div>
+            </el-col>
+            <el-col
+              :sm="searchColSpan('sm')"
+              :md="searchColSpan('md')"
+              :lg="searchColSpan('lg')"
+            >
+              <div v-loading="isLoadingSearch" class="table-wrap">
+                <component
+                  :is="searchResultsComponent"
+                  :table-data="tableData"
+                  :title-column-width="titleColumnWidth"
+                  @sort-change="handleSortChange"
+                />
+              </div>
+            </el-col>
+          </el-row>
         </el-col>
       </el-row>
+      <div class="search-heading">
+        <p v-if="!isLoadingSearch && searchData.items.length">
+          {{ searchHeading }} | Showing
+          <pagination-menu
+            :page-size="searchData.limit"
+            @update-page-size="updateDataSearchLimit"
+          />
+        </p>
+        <el-pagination
+          v-if="searchData.limit < searchData.total"
+          :small="isMobile"
+          :page-size="searchData.limit"
+          :pager-count="5"
+          :current-page="curSearchPage"
+          layout="prev, pager, next"
+          :total="searchData.total"
+          @current-change="onPaginationPageChange"
+        />
+      </div>
     </div>
     <search-filters
       v-model="filters"
@@ -96,6 +161,7 @@ import {
 } from 'ramda'
 import Breadcrumb from '@/components/Breadcrumb/Breadcrumb.vue'
 import PageHero from '@/components/PageHero/PageHero.vue'
+import PaginationMenu from '@/components/Pagination/PaginationMenu.vue'
 import SearchFilters from '@/components/SearchFilters/SearchFilters.vue'
 import SearchForm from '@/components/SearchForm/SearchForm.vue'
 
@@ -148,44 +214,26 @@ const searchData = {
   skip: 0,
   items: [],
   order: undefined,
-  ascending: false,
+  ascending: false
+}
+
+const datasetFilters = ['Public']
+
+const shouldGetEmbargoed = (searchType, datasetFilters) => {
+  const filters = Array.isArray(datasetFilters)
+    ? datasetFilters
+    : [datasetFilters]
+  return (
+    filters.includes('Embargoed') &&
+    !filters.includes('Public') &&
+    searchType === 'dataset'
+  )
 }
 
 import createClient from '@/plugins/contentful.js'
 import { handleSortChange, transformFilters } from './utils'
 
 const client = createClient()
-
-/**
- * Transform indidivual filter
- * @param {Object} filter
- */
-/*const transformIndividualFilter = filter => {
-  const category = propOr('', 'category', filter)
-  const filters = propOr([], 'tags', filter)
-
-  const transformedFilters = filters.map(filter => {
-    return {
-      label: filter.fields.name,
-      category: category,
-      key: filter.fields.slug,
-      value: false
-    }
-  })
-
-  return mergeLeft({ filters: transformedFilters }, filter)
-}*/
-
-/**
- * Transform filter response
- * @param {Object} filters
- */
-/*const transformFilters = compose(
-  flatten,
-  map(transformIndividualFilter),
-  pluck('fields'),
-  propOr([], 'filters')
-)*/
 
 export default {
   name: 'DataPage',
@@ -194,7 +242,8 @@ export default {
     Breadcrumb,
     PageHero,
     SearchFilters,
-    SearchForm
+    SearchForm,
+    PaginationMenu
   },
 
   mixins: [],
@@ -216,7 +265,10 @@ export default {
           },
           label: 'Home'
         }
-      ]
+      ],
+      titleColumnWidth: 300,
+      windowWidth: '',
+      datasetFilters: [...datasetFilters]
     }
   },
 
@@ -227,19 +279,20 @@ export default {
      */
     blackfynnApiUrl: function() {
       const searchType = pathOr('', ['query', 'type'], this.$route)
-      let url = `${
-        process.env.discover_api_host}/search/${
+
+      const embargoed = shouldGetEmbargoed(searchType, this.datasetFilters)
+
+      let url = `${process.env.discover_api_host}/search/${
         searchType === 'simulation' ? 'dataset' : searchType
-      }s?offset=${this.searchData.skip
-      }&limit=${this.searchData.limit
-      }&orderBy=${this.searchData.order || 'date'
-      }&orderDirection=${
+      }s?offset=${this.searchData.skip}&limit=${
+        this.searchData.limit
+      }&orderBy=${this.searchData.order || 'date'}&orderDirection=${
         this.searchData.ascending ? 'asc' : 'desc'
       }&${
         searchType === 'simulation'
           ? `organization=IT'IS%20Foundation`
           : 'organization=SPARC%20Consortium'
-      }`
+      }${embargoed ? `&embargo=true` : ''}`
 
       const query = pathOr('', ['query', 'q'], this.$route)
       if (query) {
@@ -302,7 +355,7 @@ export default {
         find(propEq('type', this.$route.query.type))
       )(this.searchTypes)
 
-      let searchHeading = `Showing ${start}-${end} of ${this.searchData.total} ${searchTypeLabel}`
+      let searchHeading = `${this.searchData.total} ${searchTypeLabel}`
 
       return query === '' ? searchHeading : `${searchHeading} for “${query}”`
     },
@@ -342,28 +395,47 @@ export default {
 
     q: function() {
       return this.$route.query.q || ''
+    },
+
+    /**
+     * True if user is on a small screen (mobile)
+     * @returns {Boolean}
+     */
+    isMobile: function() {
+      return this.windowWidth <= 500
     }
   },
 
   watch: {
-    '$route.query.type': function() {
+    '$route.query.type': function(val) {
       /**
        * Clear table data so the new table that is rendered can
        * properly render data and account for any missing data
        */
       this.searchData = clone(searchData)
+      if (val === 'dataset' && !this.$route.query.datasetFilters) {
+        this.datasetFilters = [...datasetFilters]
+      }
       this.fetchResults()
     },
 
     '$route.query.q': {
-      handler: function() {
-        this.searchQuery = this.$route.query.q
+      handler: function(val) {
+        if (val) {
+          this.searchQuery = this.$route.query.q
+          this.fetchResults()
+        }
       },
       immediate: true
     }
   },
+
+  beforeMount: function() {
+    this.windowWidth = window.innerWidth
+  },
   /**
    * Check the searchType param in the route and set it if it doesn't exist
+   * Shrink the title column width if on mobile
    */
   mounted: function() {
     if (!this.$route.query.type) {
@@ -371,11 +443,47 @@ export default {
 
       this.$router.replace({ query: { type: firstTabType } })
     } else {
+      /**
+       * Set the searchData from query params
+       * Need to convert skip and limit from strings to numbers
+       */
+      const queryParams = {
+        skip: Number(this.$route.query.skip || searchData.skip),
+        limit: Number(this.$route.query.limit || searchData.limit),
+        q: this.$route.query.q || ''
+      }
+
+      this.searchData = { ...this.searchData, ...queryParams }
+
+      if (this.$route.query.datasetFilters) {
+        this.datasetFilters = Array.isArray(this.$route.query.datasetFilters)
+          ? this.$route.query.datasetFilters
+          : [this.$route.query.datasetFilters]
+      }
+
       this.fetchResults()
     }
+    if (window.innerWidth <= 768) this.titleColumnWidth = 150
+    window.onresize = () => this.onResize(window.innerWidth)
   },
 
   methods: {
+    /**
+     * Update search limit based on pagination number selection
+     * @param {Number} limit
+     */
+    updateDataSearchLimit: function(limit) {
+      this.searchData.skip = 0
+
+      const newLimit = limit === 'View All' ? this.searchData.total : limit
+
+      this.searchData.limit = newLimit
+      this.$router.replace({
+        query: { ...this.$route.query, limit: newLimit, skip: 0 }
+      })
+      this.fetchResults()
+    },
+
     /**
      * Set active filters based on the query params
      * @params {Array} filters
@@ -413,7 +521,12 @@ export default {
     },
 
     handleSortChange: function(payload) {
-      handleSortChange(this.searchType.dataSource, this.searchData, this.fetchResults, payload)
+      handleSortChange(
+        this.searchType.dataSource,
+        this.searchData,
+        this.fetchResults,
+        payload
+      )
     },
 
     /**
@@ -451,6 +564,10 @@ export default {
 
       const tags = this.$route.query.tags || undefined
 
+      // Keep the original search data limit to get all organs before pagination
+      const origSearchDataLimit = this.searchData.limit
+      this.$route.query.type === 'organ' ? (this.searchData.limit = 999) : ''
+
       client
         .getEntries({
           content_type: this.$route.query.type,
@@ -461,8 +578,21 @@ export default {
           include: 2,
           'fields.tags[all]': tags
         })
-        .then(response => {
+        .then(async response => {
           this.searchData = { ...response, order: this.searchData.order }
+          if (
+            this.$route.query.type === 'organ' &&
+            origSearchDataLimit !== 999
+          ) {
+            this.searchData.items = await this.removeOrganNoDatasets()
+            // Reset search data values for pagination
+            this.searchData.limit = origSearchDataLimit
+            this.searchData.skip == 0
+              ? this.searchData.items.length > this.searchData.limit
+                ? this.searchData.items.splice(this.searchData.limit)
+                : (this.searchData.total = this.searchData.items.length)
+              : ''
+          }
         })
         .catch(() => {
           this.searchData = clone(searchData)
@@ -470,6 +600,53 @@ export default {
         .finally(() => {
           this.isLoadingSearch = false
         })
+    },
+
+    /**
+     * Get organ details from discover api
+     * @param {Object}
+     * @returns {Object}
+     */
+    getOrganDetails: function(organ) {
+      const organName = pathOr('', ['fields', 'name'], organ)
+
+      const projectSection = pathOr(
+        organName,
+        ['fields', 'projectSection', 'fields', 'title'],
+        organ
+      )
+      return this.$axios
+        .get(
+          `${
+            process.env.discover_api_host
+          }/search/datasets?query=${projectSection.toLowerCase()}&limit=1`
+        )
+        .then(response => {
+          return response.data
+        })
+    },
+
+    /**
+     * Check if an organ has datasets
+     * @param {Object}
+     * @return {Boolean}
+     */
+    hasDatasets: function(organData) {
+      return organData.totalCount > 0
+    },
+
+    /**
+     * Remove organs that do not have any
+     * associated datasets from the search data
+     * @returns {Array}
+     */
+    removeOrganNoDatasets: async function() {
+      const results = await Promise.all(
+        this.searchData.items.map(organ => this.getOrganDetails(organ))
+      )
+      return this.searchData.items.filter((organ, index) =>
+        this.hasDatasets(results[index])
+      )
     },
 
     /**
@@ -500,6 +677,10 @@ export default {
       const offset = (page - 1) * this.searchData.limit
       this.searchData.skip = offset
 
+      this.$router.replace({
+        query: { ...this.$route.query, skip: offset }
+      })
+
       this.fetchResults()
     },
 
@@ -510,9 +691,7 @@ export default {
       this.searchData.skip = 0
 
       const query = mergeLeft({ q: this.searchQuery }, this.$route.query)
-      this.$router.replace({ query }).then(() => {
-        this.fetchResults()
-      })
+      this.$router.replace({ query })
     },
 
     /**
@@ -522,9 +701,7 @@ export default {
       this.searchData.skip = 0
 
       const query = { ...this.$route.query, q: '' }
-      this.$router.replace({ query }).then(() => {
-        this.fetchResults()
-      })
+      this.$router.replace({ query })
     },
 
     /**
@@ -604,6 +781,55 @@ export default {
         .then(() => {
           this.fetchResults()
         })
+    },
+
+    /**
+     * Adjust the Title column width when
+     * on smaller screens or mobile
+     * @param {Number} width
+     */
+    onResize: function(width) {
+      width <= 768
+        ? (this.titleColumnWidth = 150)
+        : (this.titleColumnWidth = 300)
+      this.windowWidth = width
+    },
+
+    /**
+     * Compute search column span
+     * Determined if the searchType === 'dataset'
+     */
+    searchColSpan(viewport) {
+      const isDataset = this.searchType.type === 'dataset'
+      const viewports = {
+        sm: isDataset ? 24 : 24,
+        md: isDataset ? 18 : 24,
+        lg: isDataset ? 20 : 24
+      }
+
+      return viewports[viewport] || 24
+    },
+
+    /**
+     * Set datset filters
+     */
+    setDatasetFilter() {
+      this.$router.replace({
+        query: {
+          type: 'dataset',
+          q: this.$route.query.q,
+          datasetFilters: this.datasetFilters,
+          skip: 0,
+          limit: 10
+        }
+      })
+
+      /**
+       * Clear table data so the new table that is rendered can
+       * properly render data and account for any missing data
+       */
+      this.searchData = clone(searchData)
+      this.fetchResults()
     }
   }
 }
@@ -673,18 +899,35 @@ export default {
   border: 1px solid rgb(228, 231, 237);
   padding: 16px;
 }
-.el-pagination {
+::v-deep .el-pagination {
   margin-top: 1.5em;
-  text-align: center;
+  text-align: right;
+  background-color: transparent;
+  @media screen and (max-width: 28em) {
+    margin-top: 5px;
+    padding-left: 0;
+    .btn-prev {
+      padding-left: 0;
+    }
+  }
+  button {
+    background-color: transparent;
+  }
 }
 .search-heading {
   align-items: center;
   display: flex;
   margin-bottom: 1em;
+  justify-content: space-between;
+  @media screen and (max-width: 28em) {
+    flex-direction: column;
+    align-items: flex-start;
+    margin-bottom: 0;
+  }
   p {
     font-size: 0.875em;
     flex-shrink: 0;
-    margin: 0 1em 0 0;
+    margin: 2em 0 0 0;
   }
 }
 ::v-deep {
@@ -727,5 +970,31 @@ export default {
 }
 .filter__wrap {
   padding-right: 1em;
+}
+
+.dataset-filters {
+  padding: 0.5rem 1rem 1rem;
+  h2,
+  h3 {
+    font-size: 1.125rem;
+    font-weight: normal;
+    line-height: 1.2;
+  }
+  h2 {
+    border-bottom: 1px solid #dbdfe6;
+    margin-bottom: 0.5rem;
+    padding-bottom: 0.5rem;
+  }
+  h3 {
+    font-size: 0.875rem;
+    text-transform: uppercase;
+  }
+  ::v-deep .el-checkbox-group {
+    display: flex;
+    flex-direction: column;
+  }
+  ::v-deep .el-checkbox__label {
+    color: $median;
+  }
 }
 </style>

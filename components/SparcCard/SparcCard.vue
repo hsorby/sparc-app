@@ -3,9 +3,14 @@
     class="sparc-card"
     :class="{ 'sparc-card--image-right': imageAlign === 'right' }"
   >
-    <div class="sparc-card__image">
-      <img :src="image" :alt="imageAlt" />
+    <div
+      v-if="!$slots.image"
+      class="sparc-card__image"
+      :style="`background-image: url(${image})`"
+    >
+      <img class="visuallyhidden" :src="image" :alt="imageAlt" />
     </div>
+    <slot name="image" class="sparc-card__image" />
 
     <div class="sparc-card__content-wrap">
       <div class="sparc-card__content-wrap__content">
@@ -37,10 +42,8 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-$image-fixed-small: 250px;
-$image-fixed-large: 350px;
-$tablet-small: 768px;
-$tablet-large: 1024px;
+$tablet-small: 48em;
+$tablet-large: 64em;
 .sparc-card {
   @media (min-width: $tablet-small) {
     display: flex;
@@ -53,18 +56,11 @@ $tablet-large: 1024px;
     }
   }
   &__image {
+    background-size: cover;
+    background-position: center;
+    height: 300px;
     @media (min-width: $tablet-small) {
-      flex: 0 0 $image-fixed-small;
-      max-height: $image-fixed-small;
-    }
-    @media (min-width: $tablet-large) {
-      flex: 0 0 $image-fixed-large;
-      max-height: $image-fixed-large;
-    }
-    img {
-      display: block;
-      width: 100%;
-      height: 100%;
+      height: auto;
     }
   }
   &__content-wrap {
@@ -73,14 +69,7 @@ $tablet-large: 1024px;
   }
   &__image,
   &__content-wrap {
-    @media (min-width: $tablet-small) {
-      min-height: $image-fixed-small;
-      display: flex;
-    }
-    @media (min-width: $tablet-large) {
-      min-height: $image-fixed-large;
-      display: flex;
-    }
+    flex: 1 0 0em; // Unit required for IE11
     &__content {
       color: #fff;
       font-size: 0.75em;

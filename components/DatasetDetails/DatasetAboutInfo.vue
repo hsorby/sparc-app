@@ -3,86 +3,46 @@
     <div class="dataset-about-info__container">
       <h3>Last Updated</h3>
       <p>{{ updatedDate }}</p>
+      <h3>Corresponding Author</h3>
+      <p>
+        {{ datasetOwnerName }}<br />
+        {{ datasetOwnerEmail }}
+      </p>
       <h3>Dataset DOI</h3>
-      <p>{{ doi }}</p>
-      <el-row type="flex" justify="center" class="protocol-block">
-        <el-col :span="24">
-          <h3>
-            Protocol Links
-          </h3>
-          <div v-if="datasetRecords.length !== 0">
-            <a
-              v-for="(record, index) in datasetRecords"
-              :key="`${record}-${index}`"
-              :href="record.properties.url"
-              target="_blank"
-              class="dataset-about-info__container--protocol-text"
-            >
-              {{ record.properties.url }}
-            </a>
-          </div>
-          <div v-else class="dataset-about-info__container--protocol-text-na">
-            <p>N/A</p>
-          </div>
-        </el-col>
-      </el-row>
+      <p>
+        <a
+          class="dataset-about-info__container--doi-link mb-16"
+          :href="doi"
+          target="_blank"
+        >
+          {{ doi }}
+        </a>
+      </p>
       <h3>NIH Award</h3>
       <p>{{ getSparcAwardNumber }}</p>
-      <h3>Cite This Dataset</h3>
-      <div class="dataset-about-info__container--citation">
-        <el-row type="flex" justify="center">
-          <el-col :span="24">
-            <div
-              v-loading="citationLoading"
-              class="info-citation"
-              aria-live="polite"
-              v-html="citationText"
-            />
-            <div class="dataset-about-info__container--citation-links mb-24">
-              Formatted as:
-              <a
-                title="Format citation apa"
-                :class="{ 'active-citation': activeCitation === 'apa' }"
-                @click="handleCitationChanged('apa')"
-              >
-                APA
-              </a>
-              |
-              <a
-                title="Format citation chicago"
-                :class="{
-                  'active-citation':
-                    activeCitation === 'chicago-note-bibliography'
-                }"
-                @click="handleCitationChanged('chicago-note-bibliography')"
-              >
-                Chicago
-              </a>
-              |
-              <a
-                title="Format citation ieee"
-                :class="{ 'active-citation': activeCitation === 'ieee' }"
-                @click="handleCitationChanged('ieee')"
-              >
-                IEEE
-              </a>
-              |
-              <a
-                :href="`https://citation.crosscite.org/?doi=${doiValue}`"
-                target="_blank"
-              >
-                More on Crosscite.org
-              </a>
-            </div>
-          </el-col>
-        </el-row>
-      </div>
+      <template v-if="primaryPublication">
+        <h3> Primary Publication</h3>
+        <external-pub-link :publication="primaryPublication" />
+      </template>
+      <p />
       <h3>Tags</h3>
       <div v-if="datasetTags.length !== 0">
         <tag-list :tags="datasetTags" />
       </div>
       <div v-else>
         <p>N/A</p>
+      </div>
+
+      <div v-if="externalPublications.length" class="row mt-24">
+        <div class="col-xs-12">
+          <h3>References</h3>
+          <external-publication-list-item
+            v-for="publication in externalPublications"
+            :key="publication.doi"
+            class="mb-16"
+            :publication="publication"
+          />
+        </div>
       </div>
     </div>
   </div>
@@ -91,11 +51,16 @@
 <script>
 import { compose, propOr, head } from 'ramda'
 
+import ExternalPublicationListItem from '@/components/ExternalPublicationListItem/ExternalPublicationListItem.vue'
+import ExternalPubLink from '@/components/ExternalPubLink/ExternalPubLink'
 import TagList from '@/components/TagList/TagList.vue'
+
 export default {
   name: 'DatasetAboutInfo',
 
   components: {
+    ExternalPublicationListItem,
+    ExternalPubLink,
     TagList
   },
   props: {
@@ -109,17 +74,22 @@ export default {
       default: ''
     },
 
-    doiValue: {
-      type: String,
-      default: ''
-    },
-
-    datasetRecords: {
+    datasetTags: {
       type: Array,
       default: () => []
     },
 
-    datasetTags: {
+    datasetOwnerName: {
+      type: String,
+      default: ''
+    },
+
+    datasetOwnerEmail: {
+      type: String,
+      default: ''
+    },
+
+    externalPublications: {
       type: Array,
       default: () => []
     }
@@ -127,10 +97,6 @@ export default {
 
   data() {
     return {
-      citationLoading: false,
-      citationText: '',
-      activeCitation: '',
-      crosscite_host: process.env.crosscite_api_host,
       sparcAwardNumber: ''
     }
   },
@@ -145,32 +111,21 @@ export default {
     },
 
     /**
-     * Return DOI link
-     * @returns {String}
-     */
-    DOIlink: function() {
-      return this.doiValue ? `https://doi.org/${this.doiValue}` : ''
-    },
-
-    /**
      * Url to get records for model
      * @returns {String}
      */
     getRecordsUrl: function() {
       return `${process.env.discover_api_host}/search/records?datasetId=${this.$route.params.datasetId}`
-    }
+    },
+    primaryPublication: function() {
+	      const valObj = this.externalPublications.filter(function(elem) {
+	        return elem.relationshipType == 'IsDescribedBy'
+	      })
+	      return valObj.length > 0 ? valObj[0] : null
+	    }
   },
 
   watch: {
-    DOIlink: {
-      handler: function(val) {
-        if (val) {
-          this.handleCitationChanged('apa')
-        }
-      },
-      immediate: true
-    },
-
     getRecordsUrl: {
       handler: function(val) {
         if (val) {
@@ -218,30 +173,6 @@ export default {
       } catch (e) {
         console.error(e)
       }
-    },
-
-    /**
-     * gets bibiolography based on citation type for current DOI
-     * @param {String} citationType
-     */
-    handleCitationChanged: function(citationType) {
-      if (citationType === this.activeCitation) {
-        return
-      }
-      this.citationLoading = true
-      this.activeCitation = citationType
-      // find all citation types at https://github.com/citation-style-language/style
-      const url = `${this.crosscite_host}/format?doi=${this.doiValue}&style=${citationType}&lang=en-US`
-      return fetch(url)
-        .then(response => {
-          return response.text()
-        })
-        .then(text => {
-          this.citationText = text
-        })
-        .finally(() => {
-          this.citationLoading = false
-        })
     }
   }
 }
@@ -266,11 +197,21 @@ export default {
     }
 
     &--citation {
-      height: 6.5rem;
+      height: 100%;
       background: $washed-gray;
       padding-left: 1rem;
       padding-right: 1rem;
       margin-bottom: 1.5rem;
+      .copy-button {
+        margin: 1.875rem 0 1rem 0;
+        background: #f9f2fc;
+        border: 1px solid $median;
+        cursor: pointer;
+        color: $median;
+        &:hover {
+          color: #1a1489;
+        }
+      }
     }
 
     .info-citation {
@@ -282,19 +223,27 @@ export default {
     }
 
     &--citation-links {
-      font-weight: bold;
-      font-size: 14px;
-      margin-top: 1rem;
-      a {
-        text-decoration: none;
-        color: $median;
-        font-size: 14px;
-        font-weight: 500;
-        line-height: 16px;
-        cursor: pointer;
-        &.active-citation {
+      border-bottom: 1px solid #e4e7ed;
+      display: flex;
+      flex-wrap: wrap;
+      list-style: none;
+      padding: 0;
+      li {
+        margin-right: 0.5rem;
+        :hover {
+          border-bottom: 2px solid $median;
+          padding-bottom: 0.094rem;
+        }
+        a {
           color: black;
-          text-decoration: underline;
+          text-decoration: none;
+          padding: 0 0.5rem;
+          cursor: pointer;
+          &.active-citation {
+            color: $median;
+            border-bottom: 2px solid $median;
+            padding-bottom: 0.094rem;
+          }
         }
       }
     }
@@ -316,14 +265,11 @@ export default {
     .protocol-block {
       margin-bottom: 1rem;
     }
-  }
-}
-@media screen and (max-width: 768px) {
-  .dataset-about-info {
-    &__container {
-      &--citation {
-        height: 100%;
-      }
+
+    &--doi-link {
+      color: $median;
+      text-decoration: none;
+      font-weight: 500;
     }
   }
 }

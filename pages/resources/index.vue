@@ -2,26 +2,14 @@
   <div class="resources">
     <breadcrumb :breadcrumb="breadcrumb" :title="title" />
     <page-hero>
-      <h1>Resources</h1>
-      <p>
-        {{ fields.heroCopy }}
-      </p>
-      <ul class="resources__tabs">
-        <li v-for="type in tabTypes" :key="type.label">
-          <nuxt-link
-            class="resources__tabs--button"
-            :class="{ active: type.type === $route.query.type }"
-            :to="{
-              name: 'resources',
-              query: {
-                type: type.type
-              }
-            }"
-          >
-            {{ type.label }}
-          </nuxt-link>
-        </li>
-      </ul>
+      <h1>Tools &amp; Resources</h1>
+      <!-- eslint-disable vue/no-v-html -->
+      <!-- marked will sanitize the HTML injected -->
+      <div v-html="parseMarkdown(fields.heroCopyLong)" />
+      <search-controls-contentful
+        placeholder="Search resources"
+        path="/resources"
+      />
       <img
         v-if="fields.heroImage"
         slot="image"
@@ -29,75 +17,126 @@
         :src="fields.heroImage.fields.file.url"
       />
     </page-hero>
-    <div class="page-wrap container">
-      <div class="page-wrap__results">
-        <p>
-          Showing {{ currentResourceCount }} of
-          <strong>{{ totalResourceCount }}</strong>
-        </p>
-      </div>
-      <div v-loading="isLoadingResources" class="table-wrap">
-        <resources-search-results :table-data="tableData" />
-        <el-pagination
-          :page-size="resourceData.limit"
-          :pager-count="5"
-          :current-page="curSearchPage"
-          layout="prev, pager, next"
-          :total="resourceData.total"
-          @current-change="onPaginationPageChange"
+    <div class="page-wrap">
+      <div class="container">
+        <tab-nav
+          :tabs="tabTypes"
+          :active-tab="activeTab"
+          @set-active-tab="setActiveTab"
         />
+        <div class="page-wrap__results">
+          <div class="resources-heading">
+            <p>
+              {{ currentResourceCount }} {{ resourceHeading }} | Showing
+              <pagination-menu
+                :page-size="resourceData.limit"
+                @update-page-size="updateDataSearchLimit"
+              />
+              <el-pagination
+                v-if="resourceData.limit < resourceData.total"
+                :page-size="resourceData.limit"
+                :pager-count="5"
+                :current-page="curSearchPage"
+                layout="prev, pager, next"
+                :total="resourceData.total"
+                @current-change="onPaginationPageChange"
+              />
+            </p>
+          </div>
+        </div>
+        <div v-loading="isLoadingSearch" class="table-wrap">
+          <resources-search-results :table-data="tableData" />
+        </div>
+        <div class="resources-heading">
+          {{ currentResourceCount }} {{ resourceHeading }} | Showing
+          <pagination-menu
+            :page-size="resourceData.limit"
+            @update-page-size="updateDataSearchLimit"
+          />
+          <el-pagination
+            :page-size="resourceData.limit"
+            :pager-count="5"
+            :current-page="curSearchPage"
+            layout="prev, pager, next"
+            :total="resourceData.total"
+            @current-change="onPaginationPageChange"
+          />
+        </div>
       </div>
     </div>
   </div>
 </template>
 
-<script>
-import { pathOr, propOr, clone, defaultTo, compose, head } from 'ramda'
+<script lang="ts">
+import Vue from 'vue';
 import Breadcrumb from '@/components/Breadcrumb/Breadcrumb.vue'
 import ResourcesSearchResults from '@/components/Resources/ResourcesSearchResults.vue'
 import PageHero from '@/components/PageHero/PageHero.vue'
+import PaginationMenu from '@/components/Pagination/PaginationMenu.vue'
+import TabNav from '@/components/TabNav/TabNav.vue'
 import createClient from '@/plugins/contentful.js'
+import SearchControlsContentful from '@/components/SearchControlsContentful/SearchControlsContentful.vue';
+import { Computed, Data, Methods, Resource } from '~/pages/resources/model';
+import marked from '@/mixins/marked/index'
 
 const client = createClient()
 
-const resourceData = {
+const resourceData: Data['resourceData'] = {
   limit: 10,
   skip: 0,
-  items: []
+  items: [],
+  total: 0,
+  stringifySafe: () => '',
+  toPlainObject: () => ({})
 }
 
 const tabTypes = [
   {
     label: 'All Resources',
-    type: 'sparcPartners'
+    type: 'sparcPartners' as const
   },
   {
-    label: 'Platforms',
-    type: 'Platform'
+    label: 'Devices',
+    type: 'Device' as const
   },
   {
-    label: 'Tools',
-    type: 'Tool'
+    label: 'Databases',
+    type: 'Databases' as const
+  },
+  {
+    label: 'Information Services',
+    type: 'Information Services' as const
+  },
+  {
+    label: 'Software',
+    type: 'Software' as const
+  },
+  {
+    label: 'Biologicals',
+    type: 'Biologicals' as const
   }
 ]
 
-export default {
+export default Vue.extend<Data, Methods, Computed, never>({
   name: 'Resources',
 
+  mixins: [marked],
+
   components: {
+    SearchControlsContentful,
     Breadcrumb,
     ResourcesSearchResults,
-    PageHero
+    PageHero,
+    PaginationMenu,
+    TabNav
   },
 
   asyncData() {
-    return Promise.all([
       // Get page content
-      client.getEntry(process.env.ctf_resource_hero_id)
-    ])
-      .then(([page]) => {
+      return client.getEntry(process.env.ctf_resource_hero_id as string)
+      .then(({ fields }) => {
         return {
-          fields: page.fields
+          fields,
         }
       })
       .catch(console.error)
@@ -105,8 +144,7 @@ export default {
 
   data() {
     return {
-      resources: [],
-      title: 'Resources',
+      title: 'Tools & Resources',
       breadcrumb: [
         {
           to: {
@@ -115,11 +153,10 @@ export default {
           label: 'Home'
         }
       ],
-      resourceData: clone(resourceData),
-      tabTypes: tabTypes,
-      platformItems: [],
-      toolItems: [],
-      isLoadingResources: false
+      activeTab: 'sparcPartners',
+      resourceData,
+      tabTypes,
+      isLoadingSearch: false
     }
   },
 
@@ -137,21 +174,11 @@ export default {
     },
 
     /**
-     * Returns total number of resources
-     * @returns {Number}
-     */
-    totalResourceCount: function() {
-      return this.resourceData.total > 1
-        ? `${this.resourceData.total} resources`
-        : `${this.resourceData.total} resource`
-    },
-
-    /**
      * Returns data that is displayed in table
      * @returns {Array}
      */
     tableData: function() {
-      return propOr([], 'items', this.resourceData)
+      return this.resourceData.items
     },
 
     /**
@@ -159,18 +186,21 @@ export default {
      */
     curSearchPage: function() {
       return this.resourceData.skip / this.resourceData.limit + 1
+    },
+
+    /**
+     * Compute singular or plural resource heading based on count
+     */
+    resourceHeading: function() {
+      return this.currentResourceCount > 1 ? 'resources' : 'resource'
     }
   },
 
   watch: {
-    '$route.query.type': function() {
-      /**
-       * Clear table data so the new table that is rendered can
-       * properly render data and account for any missing data
-       */
-      this.resourceData = clone(resourceData)
+    '$route.query': function() {
       this.fetchResults()
-    }
+    },
+
   },
 
   /**
@@ -178,7 +208,7 @@ export default {
    */
   mounted: function() {
     if (!this.$route.query.type) {
-      const firstTabType = compose(propOr('', 'type'), head)(tabTypes)
+      const firstTabType = tabTypes[0].type
 
       this.$router.replace({ query: { type: firstTabType } })
     } else {
@@ -188,39 +218,44 @@ export default {
 
   methods: {
     /**
+     * Update search limit based on pagination number selection
+     * @param {Number} limit
+     */
+    updateDataSearchLimit: function(limit) {
+      this.resourceData.skip = 0
+      if (typeof limit === 'string') {
+        this.resourceData.limit = this.resourceData.total
+      } else {
+        this.resourceData.limit = limit
+      }
+      this.fetchResults()
+    },
+    /**
      * Fetches resource results
      */
     fetchResults: function() {
-      this.isLoadingResources = true
-      let entries = {
-        content_type: this.$route.query.type,
+      this.isLoadingSearch = true
+
+      const entries = {
+        content_type: 'sparcPartners',
         limit: this.resourceData.limit,
         skip: this.resourceData.skip,
         order: 'fields.name',
-        include: 2
-      }
-
-      if (
-        this.$route.query.type === 'Platform' ||
-        this.$route.query.type === 'Tool'
-      ) {
-        const obj = {
-          content_type: 'sparcPartners',
-          'fields.resourceType': this.$route.query.type
-        }
-        Object.assign(entries, obj)
+        include: 2,
+        query: this.$route.query.search,
+        'fields.resourceType': this.$route.query.type === 'sparcPartners'
+          ? undefined
+          : this.$route.query.type
       }
 
       client
-        .getEntries(entries)
+        .getEntries<Resource>(entries)
         .then(response => {
           this.resourceData = response
         })
-        .catch(() => {
-          this.resourceData = clone(resourceData)
-        })
+        .catch(console.error)
         .finally(() => {
-          this.isLoadingResources = false
+          this.isLoadingSearch = false
         })
     },
 
@@ -232,9 +267,23 @@ export default {
       this.resourceData.skip = offset
 
       this.fetchResults()
+    },
+
+    /**
+     * Set active tab
+     */
+    setActiveTab: function(tab) {
+      this.activeTab = tab
+      this.$router.push({
+        name: 'resources',
+        query: {
+          ...this.$route.query,
+          type: tab
+        }
+      })
     }
   }
-}
+})
 </script>
 
 <style lang="scss" scoped>
@@ -246,9 +295,17 @@ export default {
     padding: 16px;
   }
 
-  .el-pagination {
-    margin-top: 1.5em;
-    text-align: center;
+  .resources-heading {
+    margin-top: 1rem;
+  }
+
+  ::v-deep .el-pagination {
+    margin-top: -2.5em;
+    text-align: right;
+    background-color: transparent;
+    button {
+      background-color: transparent;
+    }
   }
 
   .page-wrap {
@@ -264,9 +321,6 @@ export default {
       p {
         margin-top: 1.5rem;
       }
-    }
-    @media (min-width: 48em) {
-      padding-top: 0;
     }
   }
 

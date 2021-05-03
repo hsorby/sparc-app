@@ -7,12 +7,9 @@
           About SPARC
         </nuxt-link>
         <svg-icon icon="icon-contact" width="18" height="18" />
-        <a
-          href="https://www.wrike.com/frontend/requestforms/index.html?token=eyJhY2NvdW50SWQiOjMyMDM1ODgsInRhc2tGb3JtSWQiOjI2NzEzMn0JNDcyNTk5ODQyNjYyOAllODRhYTBkZWQ2ODY2Y2U3OWNhZWI5ODkyZWMwNjgyNTBiZjExMDIzMjk4MGMxZGM1MGNhYzY0ZmQxOGMxN2Ji"
-          target="_blank"
-        >
+        <nuxt-link to="/contact-us">
           Contact Us
-        </a>
+        </nuxt-link>
         <svg-icon icon="icon-help" width="18" height="18" />
         <nuxt-link :to="{ name: 'help' }">
           Need Help?
@@ -83,12 +80,9 @@
                 </li>
                 <li>
                   <svg-icon icon="icon-contact" width="18" height="18" />
-                  <a
-                    href="https://www.wrike.com/frontend/requestforms/index.html?token=eyJhY2NvdW50SWQiOjMyMDM1ODgsInRhc2tGb3JtSWQiOjI2NzEzMn0JNDcyNTk5ODQyNjYyOAllODRhYTBkZWQ2ODY2Y2U3OWNhZWI5ODkyZWMwNjgyNTBiZjExMDIzMjk4MGMxZGM1MGNhYzY0ZmQxOGMxN2Ji"
-                    target="_blank"
-                  >
+                  <nuxt-link to="/contact-us">
                     Contact Us
-                  </a>
+                  </nuxt-link>
                 </li>
                 <li>
                   <svg-icon icon="icon-help" width="18" height="18" />
@@ -120,14 +114,23 @@
               </div>
             </div>
           </div>
-          <div v-if="shouldShowSearch" class="nav-main-container__search">
-            <input
+          <div class="nav-main-container__search">
+            <el-input
               v-model="searchQuery"
               type="text"
               class="nav-main-container__search-input"
-              placeholder="Search Datasets"
-              @keyup.enter="executeSearch"
-            />
+              placeholder="Search"
+              @keyup.native.enter="executeSearch"
+            >
+              <el-select slot="prepend" v-model="searchSelect">
+                <el-option
+                  v-for="option in searchSelectOptions"
+                  :key="option.key"
+                  :label="option.label"
+                  :value="option.value"
+                />
+              </el-select>
+            </el-input>
             <button
               class="nav-main-container__search-button"
               @click="executeSearch"
@@ -164,8 +167,13 @@ const links = [
   },
   {
     title: 'resources',
-    displayTitle: 'Resources',
+    displayTitle: 'Tools & Resources',
     href: `/resources?type=${process.env.ctf_resource_id}`
+  },
+  {
+    title: 'maps',
+    displayTitle: 'Maps',
+    href: '/maps'
   },
   {
     title: 'news-and-events',
@@ -183,7 +191,30 @@ export default {
     links,
     menuOpen: false,
     searchOpen: false,
-    searchQuery: ''
+    searchQuery: '',
+    searchSelect: 'data',
+    searchSelectOptions: [
+      {
+        key: 'data',
+        value: 'data',
+        label: 'Datasets'
+      },
+      {
+        key: 'resources',
+        value: 'resources',
+        label: 'Resources'
+      },
+      {
+        key: 'news-and-events',
+        value: 'news-and-events',
+        label: 'News and Events'
+      },
+      {
+        key: 'help',
+        value: 'help',
+        label: 'Support Center'
+      }
+    ]
   }),
 
   computed: {
@@ -271,18 +302,31 @@ export default {
     },
 
     /**
-     * Executes a search query
+     * Executes a search query based on selected
+     * option and query
      */
     executeSearch: function() {
+      const option = this.searchSelectOptions.find(
+        o => o.value === this.searchSelect
+      )
+      const searchKey = option.value === 'data' ? 'q' : 'search'
+      const type =
+        option.value === 'data'
+          ? 'dataset'
+          : option.value === 'resources'
+          ? 'sparcPartners'
+          : undefined
+
       this.$router.push({
-        name: 'data',
+        name: option.value,
         query: {
-          q: this.searchQuery,
-          type: 'dataset'
+          type,
+          [searchKey]: this.searchQuery
         }
       })
 
       this.searchQuery = ''
+      this.searchSelect = 'data'
     }
   }
 }
@@ -483,14 +527,18 @@ export default {
 }
 
 .nav-main-container__search-input {
-  width: 26vw;
+  width: 30vw;
   height: 34px;
   border-radius: 4px;
   border: solid 1px $dark-gray;
-  margin-top: 2px;
-  padding-left: 0.5rem;
   @media screen and (max-width: 1023px) {
     display: none;
+  }
+  .el-select {
+    width: 150px;
+  }
+  ::v-deep .el-input__inner {
+    color: $medium-gray;
   }
 }
 
@@ -500,6 +548,7 @@ export default {
   height: 40px;
   border-radius: 4px;
   margin-left: 9px;
+  margin-top: 1px;
   border: none;
   @media screen and (max-width: 1023px) {
     display: none;
@@ -564,7 +613,7 @@ export default {
       display: inline;
       padding-right: 5rem;
       @media screen and (min-width: 1023px) {
-        padding-right: 2rem;
+        padding-right: 0.5rem;
       }
 
       a {

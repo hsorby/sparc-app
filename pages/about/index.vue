@@ -3,20 +3,9 @@
     <breadcrumb :breadcrumb="breadcrumb" :title="pageTitle" />
     <page-hero v-if="heroCopy">
       <h1>{{ pageTitle }}</h1>
-      <p>
-        {{ heroCopy }}
-      </p>
-      <button class="about-page-button">
-        <a href="https://commonfund.nih.gov/sparc/" target="_blank">
-          More Info NIH Website
-        </a>
-      </button>
-      <img
-        v-if="heroImage"
-        slot="image"
-        class="page-hero-img"
-        :src="heroImage.fields.file.url"
-      />
+      <!-- eslint-disable vue/no-v-html -->
+      <!-- marked will sanitize the HTML injected -->
+      <div v-html="parseMarkdown(heroCopy)" />
     </page-hero>
     <div class="page-wrap container">
       <div class="subpage">
@@ -50,6 +39,14 @@
                 View Teams & Projects
               </nuxt-link>
             </button>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="futurePlans" class="subpage">
+        <div class="row">
+          <div class="subpage-col">
+            <div class="about-page-text" v-html="parseMarkdown(futurePlans)" />
           </div>
         </div>
       </div>
@@ -100,7 +97,8 @@ export default {
         }
       ],
       projectId: process.env.ctf_project_id,
-      heroImage: {}
+      heroImage: {},
+      futurePlans: ''
     }
   }
 }
@@ -148,6 +146,14 @@ export default {
     @media screen and (max-width: 767px) {
       flex-direction: column;
     }
+  }
+}
+
+.about-page-link {
+  color: white;
+  text-decoration: underline;
+  &:hover {
+    color: #909399;
   }
 }
 

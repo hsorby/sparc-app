@@ -1,19 +1,50 @@
 <template>
   <div class="upcoming-event">
     <div class="upcoming-event__image">
-      <img :src="eventImage(event)" :alt="eventAlt(event)" />
+      <nuxt-link
+        v-if="event.fields.requiresADetailsPage"
+        :to="{
+          name: 'news-and-events-events-id',
+          params: { id: event.sys.id }
+        }"
+      >
+        <img :src="eventImage(event)" :alt="eventAlt(event)" />
+      </nuxt-link>
+      <template v-else>
+        <a v-if="event.fields.url" :href="event.fields.url" target="_blank">
+          <img :src="eventImage(event)" :alt="eventAlt(event)" />
+        </a>
+        <div v-else>
+          <img :src="eventImage(event)" :alt="eventAlt(event)" />
+        </div>
+      </template>
+
       <span>{{ event.fields.eventType }}</span>
     </div>
     <h3>
-      <a :href="event.fields.url" target="_blank">
+      <nuxt-link
+        v-if="event.fields.requiresADetailsPage"
+        :to="{
+          name: 'news-and-events-events-id',
+          params: { id: event.sys.id }
+        }"
+      >
         {{ event.fields.title }}
-      </a>
+      </nuxt-link>
+      <template v-else>
+        <a v-if="event.fields.url" :href="event.fields.url" target="_blank">
+          {{ event.fields.title }}
+        </a>
+        <div v-else>
+          {{ event.fields.title }}
+        </div>
+      </template>
     </h3>
     <div class="upcoming-event__detail">
       <svg-icon name="icon-calendar" height="16" width="16" />
       <p>{{ eventDate(event) }}</p>
     </div>
-    <div class="upcoming-event__detail">
+    <div v-if="event.fields.location" class="upcoming-event__detail">
       <svg-icon name="icon-map" height="16" width="16" />
       <p>{{ event.fields.location }}</p>
     </div>
@@ -53,13 +84,15 @@ export default {
       return pathOr('', ['fields', 'image', 'fields', 'title'], event)
     },
     /**
-     * Get event date range
+     * Get event date range, if there is no end date, default to start date
      * @returns {String}
      */
     eventDate: function(event) {
-      const startDate = this.formatDate(event.fields.startDate)
-      const endDate = this.formatDate(event.fields.endDate)
-      return `${startDate} - ${endDate}`
+      const startDate = this.formatDate(event.fields.startDate || '')
+      const endDate = this.formatDate(event.fields.endDate || '')
+      return startDate === endDate || !endDate
+        ? startDate
+        : `${startDate} - ${endDate}`
     }
   }
 }
@@ -75,6 +108,7 @@ export default {
   padding: 1em;
   &__image {
     margin-bottom: 1rem;
+    overflow: hidden;
     padding-top: 100%;
     position: relative;
     img {

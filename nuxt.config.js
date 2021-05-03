@@ -1,5 +1,4 @@
 export default {
-  mode: 'universal',
   /*
    ** Headers of the page
    */
@@ -29,12 +28,17 @@ export default {
   },
   env: {
     portal_api: process.env.PORTAL_API_HOST || 'http://localhost:8000',
+    flatmap_api:
+      process.env.FLATMAP_API_HOST || 'https://mapcore-demo.org/flatmaps/',
     crosscite_api_host:
       process.env.CROSSCITE_API_HOST || 'https://citation.crosscite.org',
     discover_api_host:
       process.env.BLACKFYNN_DISCOVER_API_HOST ||
-      'https://api.blackfynn.io/discover',
-    sparc_api_host: 'http://localhost:8000',
+      'https://api.pennsieve.io/discover',
+    bf_api_host: process.env.BF_API_HOST || 'https://api.pennsieve.io',
+    zipit_api_host:
+      process.env.ZIPIT_API_HOST || 'https://api.pennsieve.io/zipit/discover',
+    osparc_host: process.env.OSPARC_HOST || 'https://osparc.io',
     ctf_event_id: 'event',
     ctf_news_id: 'news',
     ctf_resource_id: 'sparcPartners',
@@ -43,9 +47,11 @@ export default {
     ctf_help_list_id: 'helpSection',
     ctf_help_aws_id: 'zQfzadwADutviJjT19hA5',
     ctf_about_page_id: '4VOSvJtgtFv1PS2lklMcnS',
+    ctf_contact_us_page_id: '7t2GZ5F74AdNRqBau4mp8S',
     ctf_support_page_id: '59F0dM5goobqjw3TsqINRw',
     ctf_home_page_id: '4qJ9WUWXg09FAUvCnbGxBY',
     ctf_news_and_events_page_id: '4IoMamTLRlN3OpxT1zgnU',
+    ctf_dataset_navigation_info_page_id: 'qvEcnv56c76V0JC0KvtSd',
     ctf_dataset_format_info_page_id: '3FXikFXC8shPRd8xZqhjVT',
     ctf_project_id: 'sparcAward',
     ctf_organ_id: 'organ',
@@ -62,7 +68,9 @@ export default {
     CTF_CDA_ACCESS_TOKEN: process.env.CTF_CDA_ACCESS_TOKEN,
     CTF_API_HOST: process.env.CTF_API_HOST,
     BL_SERVER_URL: 'https://sparc.biolucida.net/api/v1/',
-    BL_SHARE_LINK_PREFIX: 'https://sparc.biolucida.net/image?c='
+    BL_SHARE_LINK_PREFIX: 'https://sparc.biolucida.net/image?c=',
+    ROOT_URL: process.env.ROOT_URL || 'http://localhost:3000',
+    max_download_size: parseInt(process.env.MAX_DOWNLOAD_SIZE || '5000000000')
   },
 
   serverMiddleware: [
@@ -79,7 +87,19 @@ export default {
    ** Customize router classes globally
    */
   router: {
-    linkActiveClass: 'active-link'
+    linkActiveClass: 'active-link',
+    extendRoutes(routes) {
+      // Redirects
+      routes.push({
+        path: '/submit_data.html',
+        redirect: '/help/7k8nEPuw3FjOq2HuS8OVsd'
+      })
+      routes.push({
+        name: 'version',
+        path: '/datasets/:datasetId/version/:version',
+        component: '@/pages/datasets/_datasetId.vue'
+      })
+    }
   },
   /*
    ** Global CSS
@@ -108,7 +128,8 @@ export default {
     '@nuxtjs/axios',
     '@nuxtjs/robots',
     'cookie-universal-nuxt',
-    '@miyaoka/nuxt-twitter-widgets-module'
+    '@miyaoka/nuxt-twitter-widgets-module',
+    'vue-social-sharing/nuxt'
   ],
   /*
    ** robots.txt
@@ -131,6 +152,10 @@ export default {
     /*
      ** You can extend webpack config here
      */
-    extend(config, ctx) {}
+    extend(config, ctx) {
+      if (ctx.isDev) {
+        config.devtool = ctx.isClient ? 'source-map' : 'inline-source-map'
+      }
+    }
   }
 }

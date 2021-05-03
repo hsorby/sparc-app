@@ -4,9 +4,9 @@
       <h1 v-if="heroHeading">
         {{ heroHeading }}
       </h1>
-      <p>
-        {{ heroCopy }}
-      </p>
+      <!-- eslint-disable vue/no-v-html -->
+      <!-- marked will sanitize the HTML injected -->
+      <div v-html="parseMarkdown(heroCopy)" />
       <a v-if="heroButtonLink" class="btn-link" :href="heroButtonLink">
         <el-button class="uppercase">
           {{ heroButtonLabel }}
@@ -25,8 +25,6 @@
     <homepage-news :news="newsAndEvents" />
 
     <homepage-testimonials :testimonials="testimonials" />
-
-    <homepage-twitter />
   </div>
 </template>
 
@@ -35,9 +33,10 @@ import PageHero from '@/components/PageHero/PageHero.vue'
 import FeaturedData from '@/components/FeaturedData/FeaturedData.vue'
 import HomepageNews from '@/components/HomepageNews/HomepageNews.vue'
 import HomepageTestimonials from '@/components/HomepageTestimonials/HomepageTestimonials.vue'
-import HomepageTwitter from '@/components/HomepageTwitter/HomepageTwitter.vue'
 
 import createClient from '@/plugins/contentful.js'
+import marked from '@/mixins/marked/index'
+import getHomepageFields from '@/utils/homepageFields'
 
 const client = createClient()
 export default {
@@ -47,9 +46,10 @@ export default {
     PageHero,
     FeaturedData,
     HomepageNews,
-    HomepageTestimonials,
-    HomepageTwitter
+    HomepageTestimonials
   },
+
+  mixins: [marked],
 
   asyncData() {
     return Promise.all([
@@ -57,7 +57,7 @@ export default {
       client.getEntry(process.env.ctf_home_page_id)
     ])
       .then(([homepage]) => {
-        return { ...homepage.fields }
+        return getHomepageFields(homepage.fields)
       })
       .catch(console.error)
   },
@@ -81,7 +81,8 @@ export default {
       meta: [
         {
           name: 'description',
-          content: 'Stimulating Peripheral Activity to Relieve Conditions (SPARC)'
+          content:
+            'Stimulating Peripheral Activity to Relieve Conditions (SPARC)'
         },
         {
           name: 'og:type',
@@ -93,7 +94,8 @@ export default {
         },
         {
           name: 'og:description',
-          content: 'Stimulating Peripheral Activity to Relieve Conditions (SPARC)'
+          content:
+            'Stimulating Peripheral Activity to Relieve Conditions (SPARC)'
         },
         {
           name: 'og:site_name',
@@ -109,7 +111,8 @@ export default {
         },
         {
           name: 'twitter:description',
-          content: 'Stimulating Peripheral Activity to Relieve Conditions (SPARC)'
+          content:
+            'Stimulating Peripheral Activity to Relieve Conditions (SPARC)'
         }
       ]
     }
@@ -128,5 +131,8 @@ export default {
     font-size: 1.5em;
     margin-bottom: 2rem;
   }
+}
+.page-hero-video {
+  width: 406px;
 }
 </style>

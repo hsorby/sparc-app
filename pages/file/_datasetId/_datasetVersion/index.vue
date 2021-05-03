@@ -5,7 +5,7 @@
         <div class="page-heading">
           <h1>{{ file.name }}</h1>
           <div class="page-heading__button">
-            <bf-button @click="requestDownloadFile">
+            <bf-button @click="requestDownloadFile(file)">
               Download
             </bf-button>
           </div>
@@ -52,24 +52,16 @@
       </detail-tabs>
     </div>
   </div>
-  </div>
 </template>
 
 <script>
-import {
-  compose,
-  last,
-  defaultTo,
-  split,
-  propOr
-} from 'ramda'
-
 import BiolucidaViewer from '@/components/BiolucidaViewer/BiolucidaViewer'
 import DetailTabs from '@/components/DetailTabs/DetailTabs.vue'
 import BfButton from '@/components/shared/BfButton/BfButton.vue'
 
 import BfStorageMetrics from '@/mixins/bf-storage-metrics'
 import FormatDate from '@/mixins/format-date'
+import RequestDownloadFile from '@/mixins/request-download-file'
 
 export default {
   name: 'FileDetailPage',
@@ -80,10 +72,10 @@ export default {
     BfButton
   },
 
-  mixins: [BfStorageMetrics, FormatDate],
+  mixins: [BfStorageMetrics, FormatDate, RequestDownloadFile],
 
   async asyncData({ route, $axios }) {
-    const fileUrl = `${process.env.discover_api_host}/datasets/${route.params.datasetId}/versions/${route.params.datasetVersion}/files?path=${route.params.path}`
+    const fileUrl = `${process.env.discover_api_host}/datasets/${route.params.datasetId}/versions/${route.params.datasetVersion}/files?path=${route.query.path}`
 
     const file = await $axios.$get(fileUrl)
 
@@ -127,45 +119,6 @@ export default {
     location: function() {
       return this.file.path.replace(`/${this.file.name}`, '')
     }
-  },
-
-  methods: {
-    /**
-     * Download file
-     */
-    requestDownloadFile: function() {
-      const filePath = compose(
-        last,
-        defaultTo([]),
-        split('s3://blackfynn-discover-use1/'),
-        propOr('', 'uri')
-      )(this.file)
-
-      const fileName = propOr('', 'name', this.file)
-
-      const requestUrl = `${process.env.portal_api}/download?key=${filePath}`
-      this.$axios.$get(requestUrl).then(response => {
-        this.downloadFile(fileName, response)
-      })
-    },
-
-    /**
-     * Create an `a` tag to trigger downloading file
-     * @param {String} filename
-     * @param {String} url
-     */
-    downloadFile: function(filename, url) {
-      const el = document.createElement('a')
-      el.setAttribute('href', url)
-      el.setAttribute('download', filename)
-
-      el.style.display = 'none'
-      document.body.appendChild(el)
-
-      el.click()
-
-      document.body.removeChild(el)
-    },
   }
 }
 </script>
@@ -202,7 +155,6 @@ h1 {
 .page-heading__button {
   flex-shrink: 0;
 }
-
 
 .file-detail {
   border-bottom: 1px solid #dbdfe6;

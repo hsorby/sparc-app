@@ -1,22 +1,32 @@
 <template>
   <div class="files-table">
-    <div class="breadcrumb-list">
-      <div v-for="(item, idx) in breadcrumbs" :key="idx" class="breadcrumb">
-        <a
-          class="breadcrumb-link"
-          href="#"
-          @click.prevent="breadcrumbNavigation(idx)"
-        >
-          {{ item }}
-        </a>
+    <div class="files-table-header">
+      <div class="breadcrumb-list">
+        <div v-for="(item, idx) in breadcrumbs" :key="idx" class="breadcrumb">
+          <a
+            class="breadcrumb-link"
+            href="#"
+            @click.prevent="breadcrumbNavigation(idx)"
+          >
+            {{ item }}
+          </a>
 
-        <span
-          v-if="breadcrumbs.length > 1 && idx !== breadcrumbs.length - 1"
-          class="breadcrumb-separator"
-        >
-          /
-        </span>
+          <span
+            v-if="breadcrumbs.length > 1 && idx !== breadcrumbs.length - 1"
+            class="breadcrumb-separator"
+          >
+            /
+          </span>
+        </div>
       </div>
+
+      <bf-download-file
+        class="mb-8"
+        :selected="selected"
+        :dataset="datasetDetails"
+        :file-path="path"
+        @remove-selection="removeSelection"
+      />
     </div>
 
     <div class="files-table-table">
@@ -26,7 +36,14 @@
           Try again
         </el-button>
       </div>
-      <el-table v-else v-loading="isLoading" :data="data">
+      <el-table
+        v-else
+        ref="table"
+        v-loading="isLoading"
+        :data="data"
+        @selection-change="handleSelectionChange"
+      >
+        <el-table-column type="selection" fixed width="55" />
         <el-table-column fixed prop="name" label="Name" width="340" sortable>
           <template slot-scope="scope">
             <div class="file-name-wrap">
@@ -47,18 +64,25 @@
                   class="file-icon el-icon-picture-outline"
                 />
                 <i v-else class="file-icon el-icon-document" />
-                <div v-if="isMicrosoftFileType(scope)">
+                <div v-if="isFileOpenable(scope)">
                   <a href="#" @click.prevent="openFile(scope)">
                     {{ scope.row.name }}
                   </a>
                 </div>
+                <div v-else-if="isScaffoldMetaFile(scope)">
+                  <nuxt-link :to="getScaffoldLink(scope)">
+                    {{ scope.row.name }}
+                  </nuxt-link>
+                </div>
                 <div v-else>
                   <nuxt-link
                     :to="{
-                      name: 'file-datasetId-datasetVersion-path',
+                      name: 'file-datasetId-datasetVersion',
                       params: {
                         datasetId: datasetDetails.id,
-                        datasetVersion: datasetDetails.version,
+                        datasetVersion: datasetDetails.version
+                      },
+                      query: {
                         path: scope.row.path
                       }
                     }"
@@ -98,14 +122,14 @@
               <el-dropdown-menu slot="dropdown">
                 <el-dropdown-item
                   :command="{
-                    type: 'requestDownloadFile',
+                    type: 'getDownloadFile',
                     scope
                   }"
                 >
                   Download
                 </el-dropdown-item>
                 <el-dropdown-item
-                  v-if="isMicrosoftFileType(scope)"
+                  v-if="isFileOpenable(scope)"
                   :command="{
                     type: 'openFile',
                     scope
@@ -113,11 +137,49 @@
                 >
                   Open
                 </el-dropdown-item>
+                <el-dropdown-item
+                  v-if="hasOsparcViewer(scope)"
+                  :command="{
+                    type: 'setDialogSelectedFile',
+                    scope
+                  }"
+                >
+                  Open in oSPARC&nbsp;&nbsp;&nbsp;&nbsp;<a
+                    href="/help/4EFMev665H4i6tQHfoq5NM"
+                    target="_blank"
+                  >
+                    <svg-icon icon="icon-help" width="18" height="18" />
+                  </a>
+                </el-dropdown-item>
+                <el-dropdown-item
+                  v-if="isScaffoldMetaFile(scope)"
+                  :command="{
+                    type: 'openScaffold',
+                    scope
+                  }"
+                >
+                  Open Scaffold
+                </el-dropdown-item>
+                <el-dropdown-item
+                  v-if="scope.row.uri"
+                  :command="{
+                    type: 'copyS3Url',
+                    scope
+                  }"
+                >
+                  Copy URL to Clipboard
+                </el-dropdown-item>
               </el-dropdown-menu>
             </el-dropdown>
           </template>
         </el-table-column>
       </el-table>
+      <osparc-file-viewers-dialog
+        :open="dialogSelectedFile !== null"
+        :viewers="osparcViewers"
+        :selected-file="dialogSelectedFile"
+        @close="() => setDialogSelectedFile(null)"
+      />
     </div>
   </div>
 </template>
@@ -135,12 +197,34 @@ import {
   defaultTo,
   pathOr
 } from 'ramda'
+
+import BfDownloadFile from '@/components/BfDownloadFile/BfDownloadFile'
+import OsparcFileViewersDialog from '@/components/FilesTable/OsparcFileViewersDialog.vue'
+
 import FormatStorage from '@/mixins/bf-storage-metrics/index'
+import RequestDownloadFile from '@/mixins/request-download-file'
+import { successMessage, failMessage } from '@/utils/notification-messages'
+
+import { extractExtension } from '@/pages/data/utils'
+
+const contentTypes = {
+  pdf: 'application/pdf',
+  text: 'text/plain',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  svg: 'img/svg+xml',
+  mp4: 'video/mp4'
+}
 
 export default {
   name: 'FilesTable',
 
-  mixins: [FormatStorage],
+  components: {
+    BfDownloadFile,
+    OsparcFileViewersDialog
+  },
+
+  mixins: [FormatStorage, RequestDownloadFile],
 
   props: {
     datasetDetails: {
@@ -148,6 +232,9 @@ export default {
       default: function() {
         return {}
       }
+    },
+    osparcViewers: {
+      type: Object
     }
   },
 
@@ -157,7 +244,9 @@ export default {
       data: [],
       isLoading: false,
       hasError: false,
-      limit: 500
+      limit: 500,
+      selected: [],
+      dialogSelectedFile: null
     }
   },
 
@@ -173,7 +262,7 @@ export default {
     getFilesurl: function() {
       const id = pathOr('', ['params', 'datasetId'], this.$route)
       const version = propOr(1, 'version', this.datasetDetails)
-      const url = `https://api.blackfynn.io/discover/datasets/${id}/versions/${version}/files/browse`
+      const url = `${process.env.bf_api_host}/discover/datasets/${id}/versions/${version}/files/browse`
 
       return this.path
         ? `${url}?path=${this.path}&limit=${this.limit}`
@@ -187,7 +276,7 @@ export default {
     getFilesIdUrl: function() {
       const id = pathOr('', ['params', 'datasetId'], this.$route)
       const version = propOr(1, 'version', this.datasetDetails)
-      return `https://api.blackfynn.io/discover/datasets/${id}/versions/${version}`
+      return `${process.env.bf_api_host}/discover/datasets/${id}/versions/${version}`
     }
   },
 
@@ -209,9 +298,28 @@ export default {
     }
   },
 
-  mounted: function() {},
-
   methods: {
+    /**
+     * Check if the file is openable
+     * MS Office files and native browser files
+     * - Documents (pdf, text)
+     * - Images (jpg, png)
+     * - Video (MP4)
+     * - Vector Drawings (svg)
+     */
+    isFileOpenable(scope) {
+      const allowableExtensions = Object.keys(contentTypes).map(key => key)
+      const fileType = scope.row.fileType.toLowerCase()
+      return (
+        this.isMicrosoftFileType(scope) ||
+        allowableExtensions.includes(fileType)
+      )
+    },
+
+    handleSelectionChange(val) {
+      this.selected = val
+    },
+
     /**
      * Converts a semver version string to an integer
      * @param {String} semverVersion
@@ -245,7 +353,7 @@ export default {
         .$get(this.getFilesIdUrl)
         .then(response => {
           const schemaVersion = this.convertSchemaVersionToInteger(
-            response.blackfynnSchemaVersion
+            response.pennsieveSchemaVersion
           )
           if (schemaVersion < 4.0) {
             this.path = 'packages'
@@ -267,6 +375,14 @@ export default {
         scope.row.fileType === 'MSExcel' ||
         scope.row.fileType === 'PowerPoint'
       )
+    },
+    /**
+     * Checks if file has a viewer in oSPARC
+     * @param {Object} scope
+     */
+    hasOsparcViewer(scope) {
+      const fileType = extractExtension(scope.row.path)
+      return Object.keys(this.osparcViewers).includes(fileType)
     },
     /**
      * Get contents of directory
@@ -324,23 +440,18 @@ export default {
     },
 
     /**
-     * Download file
+     * Shows the oSPARC viewers selector
+     */
+    setDialogSelectedFile: function(scope) {
+      this.dialogSelectedFile = scope ? scope.row : null
+    },
+
+    /**
+     * Get the download file for the given scope.
      * @param {Object} scope
      */
-    requestDownloadFile: function(scope) {
-      const filePath = compose(
-        last,
-        defaultTo([]),
-        split('s3://blackfynn-discover-use1/'),
-        pathOr('', ['row', 'uri'])
-      )(scope)
-
-      const fileName = pathOr('', ['row', 'name'], scope)
-
-      const requestUrl = `${process.env.portal_api}/download?key=${filePath}`
-      this.$axios.$get(requestUrl).then(response => {
-        this.downloadFile(fileName, response)
-      })
+    getDownloadFile: function(scope) {
+      this.requestDownloadFile(scope.row)
     },
 
     /**
@@ -352,36 +463,59 @@ export default {
       const filePath = compose(
         last,
         defaultTo([]),
-        split('s3://blackfynn-discover-use1/'),
+        split('s3://pennsieve-prod-discover-publish-use1/'),
         pathOr('', ['row', 'uri'])
       )(scope)
 
-      const requestUrl = `${process.env.portal_api}/download?key=${filePath}`
+      const fileType = scope.row.fileType.toLowerCase()
+      const contentType = contentTypes[fileType]
+
+      const requestUrl = `${process.env.portal_api}/download?key=${filePath}&contentType=${contentType}`
 
       this.$axios.$get(requestUrl).then(response => {
         const url = response
         const encodedUrl = encodeURIComponent(url)
-        const finalURL = `https://view.officeapps.live.com/op/view.aspx?src=${encodedUrl}`
+        const finalURL = this.isMicrosoftFileType(scope)
+          ? `https://view.officeapps.live.com/op/view.aspx?src=${encodedUrl}`
+          : url
         window.open(finalURL, '_blank')
       })
     },
 
     /**
-     * Create an `a` tag to trigger downloading file
-     * @param {String} filename
-     * @param {String} url
+     * Create nuxt-link object for opening a scaffold.
+     * @param {Object} scope
      */
-    downloadFile: function(filename, url) {
-      const el = document.createElement('a')
-      el.setAttribute('href', url)
-      el.setAttribute('download', filename)
+    getScaffoldLink: function(scope) {
+      const id = pathOr('', ['params', 'datasetId'], this.$route)
+      const version = propOr(1, 'version', this.datasetDetails)
+      let s3Path = `${id}/${version}/${scope.row.path}`
+      return {
+        name: 'datasets-scaffoldviewer-id',
+        params: {},
+        query: { scaffold: s3Path }
+      }
+    },
 
-      el.style.display = 'none'
-      document.body.appendChild(el)
+    /**
+     * Open scaffold
+     * @param {Object} scope
+     */
+    openScaffold: function(scope) {
+      this.$router.push(this.getScaffoldLink(scope))
+    },
 
-      el.click()
-
-      document.body.removeChild(el)
+    /**
+     * Checks if file is openable by scaffold viewer
+     * @param {Object} scope
+     */
+    isScaffoldMetaFile: function(scope) {
+      let path = scope.row.path.toLowerCase()
+      return (
+        path.includes('scaffold') &&
+        path.includes('meta') &&
+        path.includes('json')
+      )
     },
 
     /**
@@ -391,6 +525,34 @@ export default {
     isImage: function(fileType) {
       const images = ['JPG', 'PNG', 'JPEG', 'TIFF', 'GIF']
       return images.indexOf(fileType) >= 0
+    },
+
+    /**
+     * Remove selection
+     * @param {Object} row
+     */
+    removeSelection(row) {
+      this.selected = this.selected.filter(f => f.path !== row.path)
+
+      const selectedPaths = this.selected.map(s => s.path)
+      this.data.forEach(r => {
+        this.$refs.table.toggleRowSelection(r, selectedPaths.includes(r.path))
+      })
+    },
+
+    /**
+     * Copy file URL to clipboard
+     * @param {Object} scope
+     */
+    copyS3Url(scope) {
+      this.$copyText(scope.row.uri).then(
+        () => {
+          this.$message(successMessage(`File URL copied to clipboard.`))
+        },
+        () => {
+          this.$message(failMessage(`Cannot copy to clipboard.`))
+        }
+      )
     }
   }
 }
@@ -399,14 +561,20 @@ export default {
 <style lang="scss" scoped>
 @import '@/assets/_variables.scss';
 .breadcrumb {
+  background: none;
+  height: auto;
+  margin-bottom: 8px;
+}
+.files-table-header {
+  align-items: center;
   display: flex;
   margin-bottom: 8px;
-  background: none;
 }
 .breadcrumb-list {
+  align-items: center;
   display: flex;
+  flex: 1;
   flex-wrap: wrap;
-  margin-bottom: 8px;
 }
 .breadcrumb-link {
   word-break: break-word;
@@ -445,6 +613,9 @@ export default {
       font-size: 14px;
       font-weight: 500;
       line-height: 16px;
+    }
+    &.el-table-column--selection .cell {
+      padding: 0 14px;
     }
   }
 }
