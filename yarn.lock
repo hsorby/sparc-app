@@ -104,7 +104,7 @@
     lodash "^4.17.19"
     vue "^2.6.10"
 
-"@abi-software/plotvuer@^0.2.41":
+"@abi-software/plotvuer@^0.2.41", "@abi-software/plotvuer@^0.2.42":
   version "0.2.42"
   resolved "https://registry.yarnpkg.com/@abi-software/plotvuer/-/plotvuer-0.2.42.tgz#700f2ad1458722ebf919353df2e2584bc3e6979c"
   integrity sha512-qZATgX+G7/Y2vfL03RaihY5GFFrzqiyFrk2YepiXOeh8HUJXx7ZrUNPsDX7Q3PhjTxVhJwdWULNabU3+A3Lgtg==
@@ -14007,9 +14007,9 @@ sshpk@^1.7.0:
     tweetnacl "~0.14.0"
 
 ssri@^6.0.1:
-  version "6.0.1"
-  resolved "https://registry.yarnpkg.com/ssri/-/ssri-6.0.1.tgz#2a3c41b28dd45b62b63676ecb74001265ae9edd8"
-  integrity sha512-3Wge10hNcT1Kur4PDFwEieXSCMCJs/7WvSACcrMYrNp+b8kDL1/0wJch5Ni2WrtwEa2IO8OsVfeKIciKCDx/QA==
+  version "6.0.2"
+  resolved "https://registry.yarnpkg.com/ssri/-/ssri-6.0.2.tgz#157939134f20464e7301ddba3e90ffa8f7728ac5"
+  integrity sha512-cepbSq/neFK7xB6A50KHN0xHDotYzq58wWCa5LeWqnPrHG8GzfEjO/4O8kpmcGW+oaxkvhEJCWgbgNk4/ZV93Q==
   dependencies:
     figgy-pudding "^3.5.1"
 
