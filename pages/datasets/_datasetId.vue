@@ -316,6 +316,23 @@ const getDatasetDetails = async (datasetId, version, datasetType, $axios) => {
   }
 }
 
+/**
+ * Get all the versions of the datasets
+ * @param {Number} datasetId
+ * @param {Object} $axios
+ * @returns {Array}
+ */
+const getDatasetVersions = (datasetId, $axios) => {
+  try {
+    const url = `${process.env.discover_api_host}/datasets/${datasetId}/versions`
+    return $axios.$get(url).then(response => {
+      return response.sort((a, b) => a.verson - b.version)
+    })
+  } catch (error) {
+    return []
+  }
+}
+
 const getBiolucidaData = async datasetId => {
   try {
     return biolucida.searchDataset(datasetId)
@@ -387,6 +404,8 @@ export default {
 
     const datasetId = pathOr('', ['params', 'datasetId'], route)
 
+    const versions = await getDatasetVersions(datasetId, $axios)
+
     const organEntries = await getOrganEntries()
 
     const datasetDetails = await getDatasetDetails(
@@ -421,6 +440,7 @@ export default {
       entries: organEntries,
       datasetInfo: datasetDetails,
       datasetType: route.query.type,
+      versions: versions,
       osparcViewers,
       biolucidaImageData,
       scicrunchData,
